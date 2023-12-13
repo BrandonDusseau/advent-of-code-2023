@@ -1,6 +1,5 @@
 import os
 import re
-from pprint import pprint
 
 with open(os.path.join(os.path.dirname(__file__), "input.txt")) as f:
     raw_lines = f.readlines()
@@ -26,12 +25,9 @@ def try_fill(map, expected_counts, expected_fill_count, damaged_locations, fille
         map_copy = map.copy()
         for loc in filled_locations:
             map_copy[loc] = "#"
-        #print(f"Trying {''.join(map_copy)}")
         if is_valid(map_copy, expected_counts):
-            #print("  Pass")
             return 1
         else:
-            #print("  Fail")
             return 0
 
     valid_count = 0
@@ -73,7 +69,6 @@ arrangement_counts = []
 for i in range(0, len(spring_maps)):
     spring_map = spring_maps[i]
     spring_counts = counts[i]
-
     expected_springs = sum(spring_counts)
     current_springs = get_number_of_springs(spring_map)
     damaged_locations = get_damaged_locations(spring_map)
@@ -81,31 +76,6 @@ for i in range(0, len(spring_maps)):
 
     # First get the result of <map>
     normal_result = try_fill(spring_map, spring_counts, need_to_fill, damaged_locations, [])
-    #print(f"Result with extra ?: {multiplier}")
-
-    spring_map_with_prefix = ["?"] + spring_map
-
-    expected_springs_with_prefix = expected_springs
-    current_springs_with_prefix = get_number_of_springs(spring_map_with_prefix)
-    damaged_locations_with_prefix = get_damaged_locations(spring_map_with_prefix)
-    need_to_fill_with_prefix = expected_springs_with_prefix - current_springs_with_prefix
-
-    # First get the result of ?<map>
-    prefixed_result = try_fill(spring_map_with_prefix, spring_counts, need_to_fill_with_prefix, damaged_locations_with_prefix, [])
-    #print(f"Result with extra ?: {multiplier}")
-
-    doubled_spring_map_with_prefix = ["?"] + spring_map + ["?"] + spring_map
-    doubled_spring_counts_with_prefix = spring_counts + spring_counts
-
-    doubled_expected_springs_with_prefix = sum(doubled_spring_counts_with_prefix)
-    doubled_current_springs_with_prefix = get_number_of_springs(doubled_spring_map_with_prefix)
-    doubled_damaged_locations_with_prefix = get_damaged_locations(doubled_spring_map_with_prefix)
-    doubled_need_to_fill_with_prefix = doubled_expected_springs_with_prefix - doubled_current_springs_with_prefix
-
-    # Then get the result of ?<map>?<map> and determine our magic number
-    double_with_prefix_result = try_fill(doubled_spring_map_with_prefix, doubled_spring_counts_with_prefix, doubled_need_to_fill_with_prefix, doubled_damaged_locations_with_prefix, [])
-    multiplier = double_with_prefix_result // prefixed_result
-    #print(f"Magic number: {multiplier}")
 
     doubled_spring_map = spring_map + ["?"] + spring_map
     doubled_spring_counts = spring_counts + spring_counts
@@ -114,11 +84,12 @@ for i in range(0, len(spring_maps)):
     doubled_damaged_locations = get_damaged_locations(doubled_spring_map)
     doubled_need_to_fill = doubled_expected_springs - doubled_current_springs
 
-    base_result = try_fill(doubled_spring_map, doubled_spring_counts, doubled_need_to_fill, doubled_damaged_locations, [])
-    #print(f"Base result: {base_result}")
-    arrangement_counts.append(base_result * (multiplier ** 3))
+    # Then get the result of <map>?<map> and determine our magic number
+    double_result = try_fill(doubled_spring_map, doubled_spring_counts, doubled_need_to_fill, doubled_damaged_locations, [])
+    multiplier = double_result // normal_result
+
+    arrangement_counts.append(normal_result * (multiplier ** 4))
 
     print(f"{((i+1)/len(spring_maps)) * 100}% complete")
 
-#pprint(arrangement_counts)
 print(sum(arrangement_counts))
