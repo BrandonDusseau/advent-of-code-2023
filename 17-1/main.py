@@ -12,8 +12,11 @@ class Block(object):
         self.heat_loss = heat_loss
         self.neighbors = []
 
+    def get_key(self):
+        return (self.row, self.col)
+
     def __repr__(self):
-        print_neighbors = [f"({x.row}, {x.col})" for x in self.neighbors]
+        print_neighbors = [f"({row}, {col})" for row, col in self.neighbors]
         return f"L: ({self.row}, {self.col}), H: {self.heat_loss}, N: [{' '.join(print_neighbors)}]"
 
 def dijkstra(blocks, start):
@@ -25,125 +28,39 @@ def dijkstra(blocks, start):
         dist[v] = math.inf
         prev[v] = None
         q.append(v)
-    dist[start] = 0
-    #print(f"Dijkstra start node: {start}")
+    dist[start.get_key()] = 0
 
     while len(q) != 0:
         min_dist = math.inf
         u = None
-        for vertex in q:
-            if dist[vertex] < min_dist:
-                u = vertex
-                min_dist = dist[vertex]
-        if u is None:
-            return (None, None)
+        for test_vertex in q:
+            if dist[test_vertex] < min_dist:
+                u = test_vertex
+                min_dist = dist[test_vertex]
         q.remove(u)
 
-        for neighbor in u.neighbors:
-            if neighbor not in q:
+        for neighbor_key in blocks[u].neighbors:
+            neighbor = blocks[neighbor_key]
+            if neighbor_key not in q:
                 continue
             alt = dist[u] + neighbor.heat_loss
-            if alt < dist[neighbor]:
-                dist[neighbor] = alt
-                prev[neighbor] = u
+            if alt < dist[neighbor_key]:
+                dist[neighbor_key] = alt
+                prev[neighbor_key] = u
 
     return (dist, prev)
 
 def get_shortest_path(blocks, start, goal):
-    (dist, prev) = dijkstra(blocks.values(), start)
-
-    if dist is None:
-        return None
+    (dist, prev) = dijkstra(blocks, start)
 
     sequence = []
-    u = goal
-    if prev.get(u) is not None or u == start:
+    u = goal.get_key()
+    if prev.get(u) is not None or u == start.get_key():
         while u is not None:
-            sequence[0:0] = [u]
+            sequence.insert(0, blocks[u])
             u = prev.get(u)
 
     return sequence
-
-
-def yen(blocks, start, goal, goal_k):
-    shortest_by_k = [get_shortest_path(blocks, start, goal)]
-    #print(f"Shortest path overall:")
-    #pprint(shortest_by_k)
-    potential_k_shortest = []
-
-    for k in range(1, goal_k + 1):
-        print(f"Starting for {k}")
-        for i in range(0, len(shortest_by_k[k - 1]) - 2):
-            spur_node = shortest_by_k[k - 1][i]
-            root_path = shortest_by_k[k - 1][0:i + 1]
-
-            #print(f"Spur node for index {k - 1}: {spur_node}")
-            #print("Root path:")
-            #pprint(root_path)
-            #print()
-
-            removed_neighbors = []
-            for path in shortest_by_k:
-                if root_path == path[0:i + 1]:
-                    if path[i + 1] in path[i].neighbors:
-                        removed_neighbors.append((path[i], path[i + 1]))
-                        path[i].neighbors.remove(path[i + 1])
-                    if path[i] in path[i + 1].neighbors:
-                        removed_neighbors.append((path[i + 1], path[i]))
-                        path[i + 1].neighbors.remove(path[i])
-
-            removed_nodes = []
-            for root_path_node in root_path:
-                if root_path_node == spur_node:
-                    continue
-                #print(f"Root path node: {root_path_node}")
-                for removed_node_neighbor in root_path_node.neighbors:
-                    removed_neighbors.append((removed_node_neighbor, root_path_node))
-                    removed_node_neighbor.neighbors.remove(root_path_node)
-                    removed_neighbors.append((root_path_node, removed_node_neighbor))
-                    root_path_node.neighbors.remove(removed_node_neighbor)
-
-                removed_nodes.append(root_path_node)
-                del blocks[(root_path_node.row, root_path_node.col)]
-
-            spur_path = get_shortest_path(blocks, spur_node, goal)
-            #print(f"SPUR PATH:")
-            #pprint(spur_path)
-            #print()
-            if spur_path is not None:
-                total_path = root_path[:-1] + spur_path
-                if total_path not in potential_k_shortest:
-                    potential_k_shortest.append(total_path)
-
-            #print("Removed neighbors:")
-            #pprint(removed_neighbors)
-            for removed_neighbor in removed_neighbors:
-                if removed_neighbor[1] not in removed_neighbor[0].neighbors:
-                    removed_neighbor[0].neighbors.append(removed_neighbor[1])
-
-            #print("Removed nodes:")
-            #pprint(removed_nodes)
-            for removed_node in removed_nodes:
-                blocks[(removed_node.row, removed_node.col)] = removed_node
-
-        if len(potential_k_shortest) == 0:
-            break
-
-        min_cost = math.inf
-        min_potential_k_index = 0
-        for i in range(0, len(potential_k_shortest)):
-            path_cost = sum([x.heat_loss for x in potential_k_shortest[i]])
-            #print(f"Path cost: {path_cost}")
-            if path_cost < min_cost:
-                min_cost = path_cost
-                min_potential_k_index = i
-        #print(f"Min cost: {min_cost}")
-        #print(f"Shortest path for {k}:")
-        shortest_by_k.append(potential_k_shortest.pop(min_potential_k_index))
-        #pprint(shortest_by_k[k])
-        #print()
-
-    return shortest_by_k
 
 def get_direction(a, b):
     if b.row > a.row:
@@ -165,6 +82,35 @@ def validate_path(path):
             return False
     return True
 
+def delete_neighbor_in_direction(block, direction):
+    for neighbor_key in block.neighbors:
+        neighbor = blocks[neighbor_key]
+        if get_direction(block, neighbor) == direction:
+            block.neighbors.remove(neighbor_key)
+            neighbor.neighbors.remove(block.get_key())
+            print(f"Deleted {direction} neighbor from block {block}")
+            return (block.get_key(), neighbor_key)
+    return None
+
+def delete_reverse_neighbor(block, last_direction):
+    direction_to_delete = None
+    if last_direction == "left":
+        direction_to_delete = "right"
+    elif last_direction == "right":
+        direction_to_delete = "left"
+    elif last_direction == "up":
+        direction_to_delete = "down"
+    elif last_direction == "down":
+        direction_to_delete = "up"
+    return delete_neighbor_in_direction(block, direction_to_delete)
+
+def restore_neighbors(pairs):
+    for pair in pairs:
+        if pair is None:
+            continue
+        blocks[pair[0]].neighbors.append(pair[1])
+        blocks[pair[1]].neighbors.append(pair[0])
+
 blocks = {}
 num_rows = 0
 num_cols = 0
@@ -182,30 +128,44 @@ for raw_line in raw_lines:
 
 for loc, block in blocks.items():
     if block.row > 0:
-        block.neighbors.append(blocks[(block.row - 1, block.col)])
+        block.neighbors.append((block.row - 1, block.col))
     if block.col > 0:
-        block.neighbors.append(blocks[(block.row, block.col - 1)])
+        block.neighbors.append((block.row, block.col - 1))
     if block.row < num_rows - 1:
-        block.neighbors.append(blocks[(block.row + 1, block.col)])
+        block.neighbors.append((block.row + 1, block.col))
     if block.col < num_cols - 1:
-        block.neighbors.append(blocks[(block.row, block.col + 1)])
+        block.neighbors.append((block.row, block.col + 1))
 
-calculated_paths = 5000
-path_is_valid = False
-shortest_path = []
-k = 0
-shortest_paths = yen(blocks, blocks[(0, 0)], blocks[(num_rows - 1, num_cols - 1)], calculated_paths)
-while not path_is_valid:
-    print(f"Trying path {k}")
-    shortest_path = shortest_paths[k]
-    path_is_valid = validate_path(shortest_path)
+current_position = blocks[(0, 0)]
+shortest_path = [current_position]
+goal = blocks[(num_rows - 1, num_cols - 1)]
+last_three_directions = []
+while current_position != goal:
+    deleted_neighbors = []
 
-    k += 1
+    # We can't go backwards.
+    if len(last_three_directions) != 0:
+        deleted_neighbors.append(delete_reverse_neighbor(current_position, last_three_directions[-1]))
 
-    #if k == calculated_paths - 1:
-    #    calculated_paths *= 2
-    #    print(f"Hydrating paths to {calculated_paths}")
-    #    shortest_paths = yen(blocks, blocks[(0, 0)], blocks[(num_rows - 1, num_cols - 1)], calculated_paths)
+    # If we've traveled the same direction three times in a row, we can't proceed in that direction again.
+    if len(last_three_directions) == 3 and len(set(last_three_directions)) == 1:
+        deleted_neighbors.append(delete_neighbor_in_direction(current_position, last_three_directions[-1]))
+
+    # Get the shortest path from here.
+    next_shortest_path = get_shortest_path(blocks, current_position, goal)
+    next_position = next_shortest_path[1]
+    shortest_path.append(next_position)
+
+    if len(last_three_directions) == 3:
+        last_three_directions.pop(0)
+    last_three_directions.append(get_direction(current_position, next_position))
+    print(f"Moving {last_three_directions[-1]}")
+    print()
+
+    # Put back the neighbors we removed.
+    restore_neighbors(deleted_neighbors)
+
+    current_position = next_position
 
 pprint(shortest_path)
 print(sum([x.heat_loss for x in shortest_path]) - shortest_path[0].heat_loss)
