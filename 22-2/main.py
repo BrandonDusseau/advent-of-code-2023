@@ -64,6 +64,61 @@ def can_be_removed(bricks, brick):
             return False
     return True
 
+def get_fall_count_bfs(bricks, start):
+    queue = []
+    explored = set([start])
+    queue.append(start)
+    while len(queue) != 0:
+        next = queue.pop(0)
+        print(f"Exploring {next}")
+
+        # Skip the brick if it still has something standing under it and won't be cleared
+        # by further exploring the queue.
+        skip_brick = False
+        if next != start:
+            for supported_by_brick_id in bricks[next].supported_by:
+                if supported_by_brick_id not in explored and supported_by_brick_id not in queue:
+                    print(f"Skipping brick {next}")
+                    skip_brick = True
+
+        if skip_brick:
+            if next in explored:
+                explored.remove(next)
+            continue
+
+        for supported_brick_id in bricks[next].supports:
+            if supported_brick_id not in explored:
+                explored.add(supported_brick_id)
+                queue.append(supported_brick_id)
+
+    pprint(explored)
+    return len(explored) - 1
+
+def get_fall_count(bricks, brick_id, memo, explored):
+    print(f"Processing brick {brick_id}")
+    explored.add(brick_id)
+
+    if brick_id in memo:
+        print(f"  Memo total from beyond {brick_id} is {memo[brick_id]}")
+        return memo[brick_id]
+
+    brick = bricks[brick_id]
+    if len(brick.supports) == 0:
+        print(f"  Brick {brick_id} does not support anything")
+        memo[brick_id] = 0
+        return 0
+
+    total = 0
+    for supported_brick_id in brick.supports:
+        if supported_brick_id in explored:
+            print(f"  Skipping {supported_brick_id} because it's already been explored")
+            continue
+        total += 1 + get_fall_count(bricks, supported_brick_id, memo, explored)
+
+    memo[brick_id] = total
+    print(f"  Total from beyond {brick_id} is {total}")
+    return total
+
 with open(os.path.join(os.path.dirname(__file__), "input.txt")) as f:
     raw_lines = f.readlines()
 
@@ -91,7 +146,6 @@ for i in range(0, len(bricks)):
 
 placed_bricks = set()
 for brick in bricks:
-    print(f"Processing brick {brick.id} ({brick.__repr__()})")
     collided_bricks_at_max_z = set()
     top_of_tallest_collision = 0
     for placed_brick_id in placed_bricks:
@@ -105,17 +159,17 @@ for brick in bricks:
         elif collision and placed_brick.placed_top_z == top_of_tallest_collision:
             collided_bricks_at_max_z.add(placed_brick_id)
 
-        if collision:
-            print(f"  Collided with brick {placed_brick.__repr__()}")
-
-    print(f"  Placed brick {brick.id} at layer {top_of_tallest_collision + 1}")
     brick.placed_top_z = top_of_tallest_collision + brick.height()
     brick.supported_by = collided_bricks_at_max_z.copy()
     for collided_brick_id in collided_bricks_at_max_z:
         bricks[collided_brick_id].supports.add(brick.id)
     placed_bricks.add(brick.id)
-    print()
 
-pprint(bricks)
+memo = {}
+sum = 0
+for i in range(0, len(bricks)):
+    if not can_be_removed(bricks, bricks[i]):
+        print(f"Block {i} will cause falling")
+        sum += get_fall_count_bfs(bricks, i)
 
-print(len([x for x in bricks if can_be_removed(bricks, x)]))
+print(sum)
