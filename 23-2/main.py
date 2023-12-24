@@ -15,31 +15,33 @@ class Position(object):
         return f"[Position ({self.row}, {self.col}) with neighbors [{', '.join(print_neighbors)}]]"
 
 class StackData(object):
-    def __init__(self, current, discovered, level):
+    def __init__(self, current, seen, path):
         self.current = current
-        self.discovered = discovered
-        self.level = level
+        self.seen = seen
+        self.path = path
 
-def print_level(msg, level):
-    spaces = "".join([" " for i in range(0, level)])
-    print(f"{spaces}{msg}")
+def get_all_paths_to_end(nodes, start, end):
+    stack = [StackData(start, [], [start])]
+    paths = []
 
-def get_steps_to_end(nodes, start, end):
-    stack = [StackData(start, [], 0)]
-    steps_at_end = []
     while len(stack) != 0:
         current_stack_data = stack.pop()
         current_node = nodes[current_stack_data.current]
-        current_discovered = current_stack_data.discovered
+        current_seen = current_stack_data.seen
+        current_path = current_stack_data.path
 
-        if current_stack_data.current == end:
-            steps_at_end.append(current_stack_data.level)
+        current_seen.append(current_stack_data.current)
 
         for neighbor in current_node.neighbors:
-            if neighbor in current_discovered:
-                continue
-            stack.append(StackData(neighbor, current_discovered + [current_stack_data.current], current_stack_data.level + 1))
-    return steps_at_end
+            if neighbor not in current_seen:
+                path_to_neighbor = current_path + [neighbor]
+
+                if neighbor == end:
+                    print("Found path!")
+                    paths.append(path_to_neighbor.copy())
+                stack.append(StackData(neighbor, current_seen.copy(), path_to_neighbor))
+
+    return paths
 
 with open(os.path.join(os.path.dirname(__file__), "input.txt")) as f:
     raw_lines = f.readlines()
@@ -70,15 +72,17 @@ for row in range(0, len(grid)):
         right_symbol = grid[row][col + 1] if col < len(grid[0]) - 1 else None
 
         neighbors = []
-        if up_symbol is not None and up_symbol != "#" and symbol not in ["<", ">", "v"]:
+        if up_symbol is not None and up_symbol != "#":
             neighbors.append((row - 1, col))
-        if left_symbol is not None and left_symbol != "#" and symbol not in ["^", ">", "v"]:
+        if left_symbol is not None and left_symbol != "#":
             neighbors.append((row, col - 1))
-        if down_symbol is not None and down_symbol != "#" and symbol not in ["^", "<", ">"]:
+        if down_symbol is not None and down_symbol != "#":
             neighbors.append((row + 1, col))
-        if right_symbol is not None and right_symbol != "#" and symbol not in ["^", "<", "v"]:
+        if right_symbol is not None and right_symbol != "#":
             neighbors.append((row, col + 1))
         positions[(row, col)] = Position(row, col, neighbors)
 
-steps_to_end = get_steps_to_end(positions, start, end)
-print(max(steps_to_end))
+paths = get_all_paths_to_end(positions, start, end)
+path_lengths = [len(x) - 1 for x in paths]
+pprint(path_lengths)
+print(max(path_lengths))
